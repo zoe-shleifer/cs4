@@ -17,23 +17,22 @@ def initp(size, variance=1.0):
 
 def init_weights(x_shape,layer_sizes):
     weight_shapes = [(x_shape[1],layer_sizes[0])]
-    bias_shapes = [(x_shape[0],layer_sizes[0])]
-    bias_shapes.append(1)
-    ic(weight_shapes)
+    bias_shapes = [layer_sizes[0]]
     for i in range(len(layer_sizes)-1):
         weight_shapes.append((layer_sizes[i],layer_sizes[i+1]))
-        bias_shapes.append((layer_sizes[i],layer_sizes[i+1]))
+        bias_shapes.append((layer_sizes[i+1]))
     weight_shapes.append((layer_sizes[-1],1))
-    shapes = list(zip(weight_shapes, bias_shapes))
+    bias_shapes.append(1)
     weights = [initp(i) for i in weight_shapes]
     ic(bias_shapes)
-    biases = [initp((j,1)) for j in bias_shapes]
+    ic(weight_shapes)
+    biases = [initp((1,j)) for j in bias_shapes]
     return weights,biases
-
 def ff(weights, biases,xb):
     out = xb
     for i in range(len(weights)):
-        out = out @ weights[i] + biases[i]
+        out = out @ weights[i]
+        out += biases[i]
         ic(out.shape)
         out = softmax(out)
     return out
@@ -46,18 +45,26 @@ losses = []
 layer_shapes = [30,40]
 x = tf.Variable(X.T)
 weights,biases =  init_weights(x.shape,layer_shapes)
-ic(weights)
 while(len(losses) == 0 or losses[-1] > 0.1):
-    with tf.GradientTape() as tape:
-        preds = ff(weights,biases,x)
-        loss = loss_func(preds, y)
+    with tf.GradientTape(persistent=True) as tape:
+        out = x @ weights[0]
+        tape.watch(out)
+        out += biases[0]
+        for i in range(len(weights)-1):
+            out = np.exp(out) / np.sum(np.exp(out), axis=0)
+            out = out @ weights[i+1]
+            out += biases[i+1]
+            ic(out.shape)
+        out = np.exp(out) / np.sum(np.exp(out), axis=0)
+        loss = tf.math.reduce_mean((out-y)**2)
     dW = tape.gradient(loss, weights)
     dB = tape.gradient(loss, biases)
     losses.append(loss)
+    ic(dW)
     for i in range(len(weights)):
         weights[i].assign_sub(dW[i])
         biases[i].assign_sub(dB[i])
-    q
+
     
 plt.plot(list(range(len(losses))), losses)
 plt.ylabel('loss (MSE)')
